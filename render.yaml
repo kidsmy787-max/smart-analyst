@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: smart-analyst
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_USER
+        sync: false          # set your own in the Render dashboard
+      - key: ADMIN_PASS
+        sync: false          # set a strong password in the dashboard
+      - key: SESSION_SECRET
+        generateValue: true  # Render creates a random secret
+      - key: DATA_ROOT
+        value: /var/data     # persistent disk mount (see disk below)
+    disk:
+      name: smart-analyst-data
+      mountPath: /var/data
+      sizeGB: 1
