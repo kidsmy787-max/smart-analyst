@@ -49,9 +49,13 @@ app.use(session({
   cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 * 8 } // 8h
 }));
 
-// static
+// static — serve from ./public if it exists, otherwise from the repo root
+// (this makes it work whether index.html/admin.html are inside public/ or not)
 app.use("/uploads", express.static(UPLOAD_DIR));
-app.use(express.static(path.join(__dirname, "public")));
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, "public", "index.html"))
+  ? path.join(__dirname, "public")
+  : __dirname;
+app.use(express.static(PUBLIC_DIR));
 
 // ----- image upload -----
 const storage = multer.diskStorage({
