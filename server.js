@@ -18,19 +18,43 @@ const ADMIN_PASS = process.env.ADMIN_PASS || "smart2026";
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-this-secret-key";
 
 // ----- paths -----
-// On Render, set DATA_ROOT to your persistent disk mount path (e.g. /var/data)
-// so uploaded images + products survive restarts. Locally it defaults to ./
-const DATA_ROOT = process.env.DATA_ROOT || __dirname;
+// Prefer DATA_ROOT (e.g. a Render persistent disk at /var/data) so uploaded
+// images + products survive restarts. If that path is missing or not writable
+// (e.g. no disk attached), fall back to the app's own folder so the server
+// still starts instead of crashing.
+function pickStorageRoot() {
+  const candidates = [];
+  if (process.env.DATA_ROOT) candidates.push(process.env.DATA_ROOT);
+  candidates.push(__dirname);
+  for (const root of candidates) {
+    try {
+      const d = path.join(root, "data");
+      const u = path.join(root, "uploads");
+      fs.mkdirSync(d, { recursive: true });
+      fs.mkdirSync(u, { recursive: true });
+      // verify we can actually write here
+      const probe = path.join(root, ".write-test");
+      fs.writeFileSync(probe, "ok");
+      fs.unlinkSync(probe);
+      return root;
+    } catch (e) {
+      console.warn("Storage path not usable:", root, "-", e.message);
+    }
+  }
+  return __dirname;
+}
+const DATA_ROOT = pickStorageRoot();
+console.log("Using storage root:", DATA_ROOT);
 const DATA_DIR = path.join(DATA_ROOT, "data");
 const UPLOAD_DIR = path.join(DATA_ROOT, "uploads");
 const DB_FILE = path.join(DATA_DIR, "products.json");
-[DATA_DIR, UPLOAD_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
 
 // Seed sample products the first time only (empty or missing DB)
 if (!fs.existsSync(DB_FILE)) {
   const seedPath = path.join(__dirname, "data", "products.json");
-  const seed = fs.existsSync(seedPath) ? fs.readFileSync(seedPath, "utf8") : "[]";
-  fs.writeFileSync(DB_FILE, seed);
+  let seed = "[]";
+  try { if (fs.existsSync(seedPath)) seed = fs.readFileSync(seedPath, "utf8"); } catch (e) {}
+  try { fs.writeFileSync(DB_FILE, seed); } catch (e) { console.warn("Could not seed DB:", e.message); }
 }
 
 // ----- tiny JSON datastore -----
